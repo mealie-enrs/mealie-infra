@@ -1,0 +1,46 @@
+# Phase 3 — serving API (joins control-plane network).
+# Prerequisites: control plane up (creates network mealie-model-serve-net).
+#
+# Usage:
+#   docker compose -f infra/docker-compose.control-plane.yml up -d
+#   docker compose -f infra/docker-compose.serving.yml up -d --build
+#
+# Override model URI:
+#   MODEL_URI=models:/food-classifier@champion docker compose -f infra/docker-compose.serving.yml up -d
+
+name: mealie-model-serve-serving
+
+networks:
+  default:
+    name: mealie-model-serve-net
+    external: true
+
+services:
+  model-serve:
+    build:
+      context: ..
+      dockerfile: Dockerfile.serving
+      args:
+        GIT_SHA: local
+    image: mealie-model-serve-api:local
+    networks:
+      - default
+    environment:
+      # Service names from docker-compose.control-plane.yml on shared network mealie-model-serve-net
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_REGISTRY_URI: http://mlflow:5000
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: mmsminio
+      AWS_SECRET_ACCESS_KEY: mmsminio-dev-secret
+      AWS_DEFAULT_REGION: us-east-1
+      # After first train.py, v1 is on @staging; champion can be set via ops/promote_alias.py
+      MODEL_URI: models:/food-classifier@staging
+      MODEL_CACHE_DIR: /var/lib/model-cache
+      MODEL_PROVIDER: cpu
+    volumes:
+      - mms_model_cache:/var/lib/model-cache
+    ports:
+      - "18080:8080"
+
+volumes:
+  mms_model_cache:

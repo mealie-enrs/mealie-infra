@@ -1,0 +1,43 @@
+# Pods on some k3s nodes cannot resolve public DNS (CoreDNS / systemd-resolved).
+# Map CHI@UC object-store hostname to its A record so boto3 can connect.
+# Refresh IP if this breaks: dig +short chi.uc.chameleoncloud.org A
+# CHI@TACC: use chi.tacc.chameleoncloud.org and its dig IP in a fork of this file.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mms-mlflow
+  namespace: mms
+spec:
+  template:
+    spec:
+      hostAliases:
+        - ip: "192.5.87.2"
+          hostnames:
+            - "chi.uc.chameleoncloud.org"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mms-model-serve
+  namespace: mms
+spec:
+  template:
+    spec:
+      hostAliases:
+        - ip: "192.5.87.2"
+          hostnames:
+            - "chi.uc.chameleoncloud.org"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mms-seed-toy-model
+  namespace: mms
+spec:
+  template:
+    spec:
+      hostAliases:
+        - ip: "192.5.87.2"
+          hostnames:
+            - "chi.uc.chameleoncloud.org"

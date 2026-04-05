@@ -1,0 +1,168 @@
+# infra/docker-compose.serving-options.yml
+# Four serving configurations for Q2.1 benchmarking table.
+# Each service runs the same app but with different ORT/threading/GPU env vars.
+# All join mealie-model-serve-net (created by docker-compose.control-plane.yml).
+#
+# Prerequisites:
+#   docker compose -f infra/docker-compose.control-plane.yml up -d
+#   python trainer/train.py   (registers food-classifier@staging in MLflow)
+#
+# Start all 4 options:
+#   docker compose -f infra/docker-compose.serving-options.yml up -d --build
+#
+# Start one option only:
+#   docker compose -f infra/docker-compose.serving-options.yml up -d --build baseline-http
+#
+# Benchmark each option (run from repo root):
+#   python eval/benchmark.py --url http://localhost:18080/predict --option baseline_http --n 200 --concurrency 1
+#   python eval/benchmark.py --url http://localhost:18081/predict --option onnx_ort_all  --n 200 --concurrency 4
+#   python eval/benchmark.py --url http://localhost:18082/predict --option multi_worker   --n 200 --concurrency 8
+#   python eval/benchmark.py --url http://localhost:18083/predict --option gpu_cuda       --n 200 --concurrency 8
+#
+# Stop all:
+#   docker compose -f infra/docker-compose.serving-options.yml down
+
+
+name: mealie-serving-options
+
+networks:
+  default:
+    name: mealie-model-serve-net
+    external: true
+
+volumes:
+  mms_model_cache:
+
+#  Shared anchor for common env vars
+x-common-env: &common-env
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  MLFLOW_REGISTRY_URI: http://mlflow:5000
+  MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+  AWS_ACCESS_KEY_ID: mmsminio
+  AWS_SECRET_ACCESS_KEY: mmsminio-dev-secret
+  AWS_DEFAULT_REGION: us-east-1
+  MODEL_URI: models:/food-classifier@staging   # dummy model for NOW.
+  SKIP_MODEL_LOAD: "1"
+  MODEL_CACHE_DIR: /var/lib/model-cache
+
+services:
+
+  # Option 1: baseline_http 
+  # Plain CPU, ORT graph optimization disabled, single thread, sequential mode.
+  # This is the simplest reference point — no optimizations applied.
+  baseline-http:
+    build:
+      context: ..
+      dockerfile: Dockerfile.serving
+      args:
+        GIT_SHA: ${GIT_SHA:-local}
+    image: mealie-model-serve-api:local
+    container_name: mealie-baseline-http
+    networks: [default]
+    ports:
+      - "18080:8080"
+    volumes:
+      - mms_model_cache:/var/lib/model-cache
+    environment:
+      <<: *common-env
+      SERVING_OPTION_ID: baseline_http
+      MODEL_PROVIDER: cpu
+      ORT_GRAPH_OPTIMIZATION_LEVEL: disable
+      ORT_INTRA_OP_NUM_THREADS: 1
+      ORT_INTER_OP_NUM_THREADS: 1
+      ORT_EXECUTION_MODE: sequential
+    restart: unless-stopped
+
+  # Option 2: onnx_ort_all
+  # Model-level optimization: ORT graph optimization level=all (fusion, constant
+  # folding, layout optimization). Same CPU hardware as baseline — isolates the
+  # model-level optimization benefit.
+  onnx-ort-all:
+    build:
+      context: ..
+      dockerfile: Dockerfile.serving
+      args:
+        GIT_SHA: ${GIT_SHA:-local}
+    image: mealie-model-serve-api:local
+    container_name: mealie-onnx-ort-all
+    networks: [default]
+    ports:
+      - "18081:8080"
+    volumes:
+      - mms_model_cache:/var/lib/model-cache
+    environment:
+      <<: *common-env
+      SERVING_OPTION_ID: onnx_ort_all
+      MODEL_PROVIDER: cpu
+      ORT_GRAPH_OPTIMIZATION_LEVEL: all
+      ORT_INTRA_OP_NUM_THREADS: 0
+      ORT_INTER_OP_NUM_THREADS: 0
+      ORT_EXECUTION_MODE: parallel
+    restart: unless-stopped
+
+  # Option 3: multi_worker
+  # System-level optimization: multiple uvicorn workers + ORT parallel execution.
+  # Increases concurrency capacity at the system level.
+  # Note: worker count is set via CMD override in this compose entry.
+  multi-worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile.serving
+      args:
+        GIT_SHA: ${GIT_SHA:-local}
+    image: mealie-model-serve-api:local
+    container_name: mealie-multi-worker
+    networks: [default]
+    ports:
+      - "18082:8080"
+    volumes:
+      - mms_model_cache:/var/lib/model-cache
+    environment:
+      <<: *common-env
+      SERVING_OPTION_ID: multi_worker
+      MODEL_PROVIDER: cpu
+      ORT_GRAPH_OPTIMIZATION_LEVEL: all
+      ORT_INTRA_OP_NUM_THREADS: 0
+      ORT_INTER_OP_NUM_THREADS: 0
+      ORT_EXECUTION_MODE: parallel
+    # Override CMD to run 4 uvicorn workers (system-level scaling)
+    command: >
+      uvicorn serving.app:app
+      --host 0.0.0.0
+      --port 8080
+      --workers 4
+    restart: unless-stopped
+
+  # Option 4: gpu_cuda
+  # Combined optimization: ORT all + CUDAExecutionProvider on RTX 6000 (nc33).
+  # Requires --gpus all support (nvidia-container-toolkit on Chameleon GPU node).
+  # Falls back to CPU if CUDA unavailable.
+  gpu-cuda:
+    build:
+      context: ..
+      dockerfile: Dockerfile.serving
+      args:
+        GIT_SHA: ${GIT_SHA:-local}
+    image: mealie-model-serve-api:local
+    container_name: mealie-gpu-cuda
+    networks: [default]
+    ports:
+      - "18083:8080"
+    volumes:
+      - mms_model_cache:/var/lib/model-cache
+    environment:
+      <<: *common-env
+      SERVING_OPTION_ID: gpu_cuda
+      MODEL_PROVIDER: cuda
+      ORT_GRAPH_OPTIMIZATION_LEVEL: all
+      ORT_INTRA_OP_NUM_THREADS: 0
+      ORT_INTER_OP_NUM_THREADS: 0
+      ORT_EXECUTION_MODE: parallel
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped

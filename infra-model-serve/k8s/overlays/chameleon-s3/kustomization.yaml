@@ -1,0 +1,74 @@
+# Deploy MMS with Chameleon object store (S3 API) instead of in-cluster MinIO.
+#
+# Before apply:
+# 1) Create Swift container if needed: openstack container create <name>
+# 2) EC2/S3 credentials: openstack ec2 credentials create
+# 3) Put access key in secret key MINIO_ROOT_USER and secret key in MINIO_ROOT_PASSWORD
+#    (same env names as MinIO; values are Chameleon S3 keys — see infra/k8s/DEPLOY.md).
+# 4) Edit patch-config-chameleon.yaml: container name + CHI@UC vs CHI@TACC endpoint.
+#
+#   kubectl apply -f your-mms-secrets.yaml
+#   kubectl kustomize infra/k8s/overlays/chameleon-s3 --load-restrictor LoadRestrictionsNone | kubectl apply -f -
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: mms
+resources:
+  - ../../namespace.yaml
+  - ../../configmap.yaml
+  - ../../postgres.yaml
+  - ../../mlflow.yaml
+  - ../../model-serve.yaml
+  - ../../job-seed-toy-model.yaml
+images:
+  - name: ghcr.io/your-org/mealie-model-serve-mlflow
+    newName: mealie-model-serve-mlflow
+    newTag: latest
+  - name: ghcr.io/your-org/mealie-model-serve-api
+    newName: mealie-model-serve-api
+    newTag: latest
+patches:
+  - path: patch-hostnetwork-egress.yaml
+  - path: patch-deployment-recreate.yaml
+  - path: patch-hostaliases-chi-uc.yaml
+  - path: patch-config-chameleon.yaml
+  - target:
+      kind: Deployment
+      name: mms-mlflow
+      namespace: mms
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/initContainers
+        value:
+          - name: wait-postgres
+            image: busybox:1.36
+            command:
+              - sh
+              - -c
+              - |
+                until nc -z postgres 5432; do sleep 2; done
+  - target:
+      kind: Deployment
+      name: mms-mlflow
+      namespace: mms
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: ARTIFACT_STORE_WAIT_MODE
+          value: "s3"
+  - target:
+      kind: Deployment
+      name: mms-mlflow
+      namespace: mms
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+  - target:
+      kind: Deployment
+      name: mms-model-serve
+      namespace: mms
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent

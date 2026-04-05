@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: mms
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres.yaml
+  - minio.yaml
+  - mlflow.yaml
+  - model-serve.yaml
+# Default names work with `docker build -t mealie-model-serve-mlflow:latest` + `k3s ctr images import`.
+# Override via `images:` in an overlay or CI when using a real registry (and set imagePullPolicy back to Always).
+images:
+  - name: ghcr.io/your-org/mealie-model-serve-mlflow
+    newName: mealie-model-serve-mlflow
+    newTag: latest
+  - name: ghcr.io/your-org/mealie-model-serve-api
+    newName: mealie-model-serve-api
+    newTag: latest
+# Optional (private GHCR): add after creating Secret ghcr-pull in mms:
+#   - path: patches/ghcr-imagepull.yaml
+patches:
+  - target:
+      kind: Deployment
+      name: mms-mlflow
+      namespace: mms
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+  - target:
+      kind: Deployment
+      name: mms-model-serve
+      namespace: mms
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent

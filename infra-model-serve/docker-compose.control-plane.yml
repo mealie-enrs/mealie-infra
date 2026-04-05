@@ -1,0 +1,72 @@
+# Phase 1 — control plane: Postgres + MinIO + MLflow (Model Registry).
+# Network name is fixed so docker-compose.serving.yml can attach.
+#
+# Usage: docker compose -f infra/docker-compose.control-plane.yml up -d --build
+# MLflow UI: http://localhost:15001
+
+name: mealie-model-serve
+
+networks:
+  mms-net:
+    name: mealie-model-serve-net
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    networks: [mms-net]
+    environment:
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow
+      POSTGRES_DB: mlflow
+    volumes:
+      - mms_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow -d mlflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "55435:5432"
+
+  minio:
+    image: minio/minio:latest
+    networks: [mms-net]
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: mmsminio
+      MINIO_ROOT_PASSWORD: mmsminio-dev-secret
+    volumes:
+      - mms_minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    ports:
+      - "9020:9000"
+      - "9021:9001"
+
+  mlflow:
+    build:
+      context: ..
+      dockerfile: Dockerfile.mlflow
+    image: mealie-model-serve-mlflow:local
+    networks: [mms-net]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://mlflow:mlflow@postgres:5432/mlflow
+      MLFLOW_ARTIFACTS_DESTINATION: s3://mlflow-artifacts
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: mmsminio
+      AWS_SECRET_ACCESS_KEY: mmsminio-dev-secret
+    ports:
+      - "15001:5000"
+
+volumes:
+  mms_pgdata:
+  mms_minio:

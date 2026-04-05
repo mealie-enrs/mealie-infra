@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mms-model-serve
+  namespace: mms
+spec:
+  type: NodePort
+  selector:
+    app: mms-model-serve
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30608
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mms-model-serve
+  namespace: mms
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mms-model-serve
+  template:
+    metadata:
+      labels:
+        app: mms-model-serve
+    spec:
+      containers:
+        - name: model-serve
+          image: ghcr.io/your-org/mealie-model-serve-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: UVICORN_WORKERS
+              value: "1"
+            - name: MLFLOW_TRACKING_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: mms-config
+                  key: MLFLOW_TRACKING_URI
+            - name: MLFLOW_REGISTRY_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: mms-config
+                  key: MLFLOW_REGISTRY_URI
+            - name: MLFLOW_S3_ENDPOINT_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: mms-config
+                  key: MLFLOW_S3_ENDPOINT_URL
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: mms-secrets
+                  key: MINIO_ROOT_USER
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mms-secrets
+                  key: MINIO_ROOT_PASSWORD
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            - name: AWS_REQUEST_CHECKSUM_CALCULATION
+              value: "WHEN_REQUIRED"
+            - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+              value: "WHEN_REQUIRED"
+            - name: MODEL_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: mms-config
+                  key: MODEL_URI
+            - name: MODEL_CACHE_DIR
+              value: "/var/lib/model-cache"
+            - name: MODEL_PROVIDER
+              value: "cpu"
+            - name: SERVING_OPTION_ID
+              value: "k8s_nodeport"
+          volumeMounts:
+            - name: model-cache
+              mountPath: /var/lib/model-cache
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+      volumes:
+        - name: model-cache
+          emptyDir: {}

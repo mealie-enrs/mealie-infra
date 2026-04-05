@@ -1,0 +1,84 @@
+# One-shot: register toy ONNX as food-classifier@staging so model-serve /readyz passes.
+# Kubernetes Jobs are immutable: to re-apply after template changes, delete first:
+#   kubectl -n mms delete job mms-seed-toy-model --ignore-not-found
+# Then: kubectl apply -f job-seed-toy-model.yaml && kubectl -n mms wait --for=condition=complete job/mms-seed-toy-model --timeout=300s
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mms-seed-toy-model
+  namespace: mms
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: seed
+          image: mealie-model-serve-api:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MLFLOW_TRACKING_URI
+              value: "http://mlflow:5000"
+            - name: MLFLOW_S3_ENDPOINT_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: mms-config
+                  key: MLFLOW_S3_ENDPOINT_URL
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: mms-secrets
+                  key: MINIO_ROOT_USER
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mms-secrets
+                  key: MINIO_ROOT_PASSWORD
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            - name: AWS_REQUEST_CHECKSUM_CALCULATION
+              value: "WHEN_REQUIRED"
+            - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+              value: "WHEN_REQUIRED"
+          command:
+            - python
+            - -c
+            - |
+              import os
+              import mlflow
+              import mlflow.onnx
+              import numpy as np
+              import onnx
+              from mlflow.tracking import MlflowClient
+              from onnx import TensorProto, helper
+
+              def build_toy_onnx(n_in=4, n_out=3, seed=42):
+                  rng = np.random.default_rng(seed)
+                  w = rng.standard_normal((n_in, n_out)).astype(np.float32)
+                  b = rng.standard_normal((n_out,)).astype(np.float32)
+                  w_init = onnx.numpy_helper.from_array(w, name="W")
+                  b_init = onnx.numpy_helper.from_array(b, name="B")
+                  x = helper.make_tensor_value_info("float_input", TensorProto.FLOAT, [None, n_in])
+                  y = helper.make_tensor_value_info("logits", TensorProto.FLOAT, [None, n_out])
+                  matmul = helper.make_node("MatMul", ["float_input", "W"], ["pre"])
+                  add = helper.make_node("Add", ["pre", "B"], ["logits"])
+                  graph = helper.make_graph(
+                      [matmul, add], "toy_linear", [x], [y], initializer=[w_init, b_init]
+                  )
+                  model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 13)])
+                  onnx.checker.check_model(model)
+                  return model
+
+              model = build_toy_onnx()
+              mlflow.set_tracking_uri(os.environ["MLFLOW_TRACKING_URI"])
+              mlflow.set_experiment("mealie-model-serve")
+              with mlflow.start_run(run_name="seed-food-classifier") as run:
+                  mlflow.log_param("placeholder", True)
+                  mlflow.onnx.log_model(model, "model")
+                  rid = run.info.run_id
+              mv = mlflow.register_model(f"runs:/{rid}/model", "food-classifier")
+              ver = str(mv.version)
+              client = MlflowClient(tracking_uri=os.environ["MLFLOW_TRACKING_URI"])
+              client.set_registered_model_alias("food-classifier", "staging", ver)
+              print(f"registered food-classifier v{ver} @staging")

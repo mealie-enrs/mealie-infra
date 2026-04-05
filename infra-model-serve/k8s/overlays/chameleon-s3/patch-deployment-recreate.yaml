@@ -1,0 +1,20 @@
+# hostNetwork binds host ports 5000 / 8080 — RollingUpdate runs two pods at once on one node,
+# so the second pod stays Pending (port in use). Recreate: tear down old, then start new.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mms-mlflow
+  namespace: mms
+spec:
+  strategy:
+    type: Recreate
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mms-model-serve
+  namespace: mms
+spec:
+  strategy:
+    type: Recreate

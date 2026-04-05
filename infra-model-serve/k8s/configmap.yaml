@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mms-config
+  namespace: mms
+data:
+  DATABASE_NAME: "mlflow"
+  DATABASE_USER: "mlflow"
+  DATABASE_HOST: "postgres"
+  DATABASE_PORT: "5432"
+  MLFLOW_ARTIFACTS_DESTINATION: "s3://mlflow-artifacts"
+  MLFLOW_S3_ENDPOINT_URL: "http://minio:9000"
+  MINIO_BUCKET: "mlflow-artifacts"
+  # In-cluster MLflow URL for model-serve
+  MLFLOW_TRACKING_URI: "http://mlflow:5000"
+  MLFLOW_REGISTRY_URI: "http://mlflow:5000"
+  MODEL_URI: "models:/food-classifier@staging"

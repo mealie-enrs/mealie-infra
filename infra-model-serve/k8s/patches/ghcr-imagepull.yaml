@@ -1,0 +1,23 @@
+# Use with overlay `overlays/with-ghcr-auth` (or merge into your own Kustomization).
+# Requires Secret `ghcr-pull` in namespace `mms` before pods can schedule.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mms-mlflow
+  namespace: mms
+spec:
+  template:
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mms-model-serve
+  namespace: mms
+spec:
+  template:
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull

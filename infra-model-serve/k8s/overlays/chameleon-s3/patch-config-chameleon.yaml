@@ -1,0 +1,15 @@
+# Strategic merge: overrides mms-config for Chameleon S3 (Swift container = S3 bucket).
+# All project object data under prefix serve/ in proj26-obj-store.
+# Replace proj26-obj-store if you use a different Swift container name.
+#
+# MLflow artifacts: s3://proj26-obj-store/serve/mlflow-artifacts/...
+# You can add other keys under serve/ manually (e.g. serve/exports/...) in the same bucket.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mms-config
+  namespace: mms
+data:
+  MLFLOW_ARTIFACTS_DESTINATION: "s3://proj26-obj-store/serve/mlflow-artifacts"
+  MLFLOW_S3_ENDPOINT_URL: "https://chi.uc.chameleoncloud.org:7480"
+  MINIO_BUCKET: "proj26-obj-store"
