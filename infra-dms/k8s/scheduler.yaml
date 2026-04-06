@@ -17,13 +17,6 @@ spec:
         - name: dms-scheduler
           image: ghcr.io/nidhish1/dms-app:latest
           imagePullPolicy: Always
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
           env:
             - name: DMS_ROLE
               value: scheduler

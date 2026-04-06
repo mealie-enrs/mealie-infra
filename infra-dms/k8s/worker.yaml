@@ -17,27 +17,9 @@ spec:
         - name: dms-worker
           image: ghcr.io/nidhish1/dms-app:latest
           imagePullPolicy: Always
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-          resources:
-            requests:
-              cpu: 500m
-              memory: 1Gi
-            limits:
-              cpu: "2"
-              memory: 4Gi
           env:
             - name: DMS_ROLE
               value: worker
-            - name: DMS_IMAGE_SANITIZE_ENABLED
-              value: "true"
-            - name: DMS_IMAGE_ALLOWED_EXTENSIONS
-              value: .jpg,.jpeg
-            - name: MAGICK_CONFIGURE_PATH
-              value: /etc/dms-imagemagick
             - name: REDIS_URL
               valueFrom:
                 configMapKeyRef:
@@ -119,11 +101,3 @@ spec:
                   key: KAGGLE_KEY
             - name: KAGGLE_DOWNLOAD_DIR
               value: /tmp/dms-kaggle-downloads
-          volumeMounts:
-            - name: imagemagick-policy
-              mountPath: /etc/dms-imagemagick
-              readOnly: true
-      volumes:
-        - name: imagemagick-policy
-          configMap:
-            name: dms-imagemagick-policy

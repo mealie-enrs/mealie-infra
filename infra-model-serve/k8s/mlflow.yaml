@@ -31,13 +31,6 @@ spec:
       initContainers:
         - name: wait-postgres
           image: busybox:1.36
-          resources:
-            requests:
-              cpu: 10m
-              memory: 32Mi
-            limits:
-              cpu: 100m
-              memory: 64Mi
           command:
             - sh
             - -c
@@ -45,13 +38,6 @@ spec:
               until nc -z postgres 5432; do sleep 2; done
         - name: wait-minio
           image: busybox:1.36
-          resources:
-            requests:
-              cpu: 10m
-              memory: 32Mi
-            limits:
-              cpu: 100m
-              memory: 64Mi
           command:
             - sh
             - -c
@@ -61,13 +47,6 @@ spec:
         - name: mlflow
           image: ghcr.io/your-org/mealie-model-serve-mlflow:latest
           imagePullPolicy: Always
-          resources:
-            requests:
-              cpu: 250m
-              memory: 512Mi
-            limits:
-              cpu: "1"
-              memory: 1Gi
           ports:
             - containerPort: 5000
           env:

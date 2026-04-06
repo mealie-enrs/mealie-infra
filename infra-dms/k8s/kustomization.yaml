@@ -4,7 +4,6 @@ namespace: dms
 resources:
   - namespace.yaml
   - configmap.yaml
-  - imagemagick-policy.yaml
   - postgres.yaml
   - redis.yaml
   - api.yaml

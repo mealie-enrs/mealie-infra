@@ -8,7 +8,6 @@ resources:
   - minio.yaml
   - mlflow.yaml
   - model-serve.yaml
-  - job-train-food-classifier.yaml
 # Default names work with `docker build -t mealie-model-serve-mlflow:latest` + `k3s ctr images import`.
 # Override via `images:` in an overlay or CI when using a real registry (and set imagePullPolicy back to Always).
 images:
