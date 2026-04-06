@@ -4,13 +4,13 @@ namespace: dms
 resources:
   - namespace.yaml
   - configmap.yaml
-  - imagemagick-policy.yaml
   - postgres.yaml
   - redis.yaml
+  - metabase.yaml
   - api.yaml
   - worker.yaml
   - scheduler.yaml
 images:
-  - name: ghcr.io/your-org/dms-app
-    newName: ghcr.io/your-org/dms-app
+  - name: ghcr.io/nidhish1/dms-app
+    newName: ghcr.io/nidhish1/dms-app
     newTag: latest
