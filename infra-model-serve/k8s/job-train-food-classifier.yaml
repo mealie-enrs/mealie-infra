@@ -1,0 +1,81 @@
+# One-shot: run train.py on a Chameleon GPU node with RTX 6000-class GPU resources.
+# Kubernetes Jobs are immutable: delete and re-apply after edits.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mms-train-food-classifier
+  namespace: mms
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - gigaio02
+                      - gigaio03
+                      - gigaio04
+                      - gigaio05
+                      - gigaio06
+      restartPolicy: Never
+      containers:
+        - name: train
+          image: ghcr.io/your-org/mealie-model-serve-api:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: 16Gi
+              nvidia.com/gpu: "1"
+          env:
+            - name: MLFLOW_TRACKING_URI
+              value: "http://mlflow:5000"
+            - name: MLFLOW_S3_ENDPOINT_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: mms-config
+                  key: MLFLOW_S3_ENDPOINT_URL
+            - name: MLFLOW_ARTIFACTS_DESTINATION
+              valueFrom:
+                configMapKeyRef:
+                  name: mms-config
+                  key: MLFLOW_ARTIFACTS_DESTINATION
+            - name: MLFLOW_BACKEND_STORE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mms-secrets
+                  key: MLFLOW_BACKEND_STORE_URI
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: mms-secrets
+                  key: MINIO_ROOT_USER
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mms-secrets
+                  key: MINIO_ROOT_PASSWORD
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            - name: AWS_REQUEST_CHECKSUM_CALCULATION
+              value: "WHEN_REQUIRED"
+            - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+              value: "WHEN_REQUIRED"
+            - name: MODEL_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: mms-config
+                  key: MODEL_URI
+          command:
+            - python
+            - trainer/train.py

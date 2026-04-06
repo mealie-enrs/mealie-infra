@@ -28,10 +28,65 @@ spec:
       labels:
         app: mms-model-serve
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - nc01
+                      - nc02
+                      - nc03
+                      - nc04
+                      - nc05
+                      - nc06
+                      - nc07
+                      - nc08
+                      - nc09
+                      - nc10
+                      - nc11
+                      - nc12
+                      - nc13
+                      - nc14
+                      - nc15
+                      - nc16
+                      - nc17
+                      - nc18
+                      - nc19
+                      - nc20
+                      - nc21
+                      - nc22
+                      - nc23
+                      - nc24
+                      - nc25
+                      - nc26
+                      - nc27
+                      - nc28
+                      - nc29
+                      - nc30
+                      - nc31
+                      - nc32
+                      - nc33
+                      - nc34
+                      - nc35
+                      - nc36
+                      - nc37
+                      - nc38
       containers:
         - name: model-serve
           image: ghcr.io/your-org/mealie-model-serve-api:latest
           imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: 1
+              memory: 2Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "2"
+              memory: 4Gi
+              nvidia.com/gpu: "1"
           ports:
             - containerPort: 8080
           env:
@@ -78,7 +133,7 @@ spec:
             - name: MODEL_CACHE_DIR
               value: "/var/lib/model-cache"
             - name: MODEL_PROVIDER
-              value: "cpu"
+              value: "cuda"
             - name: SERVING_OPTION_ID
               value: "k8s_nodeport"
           volumeMounts:

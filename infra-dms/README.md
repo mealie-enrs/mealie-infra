@@ -104,3 +104,34 @@ Increase API replicas:
 ```bash
 kubectl -n dms scale deployment/dms-api --replicas=2
 ```
+
+## 7) JPG Sanitization Hardening (ImageMagick)
+
+This infra path includes a hardened ImageMagick policy for `.jpg`/`.jpeg`
+processing in DMS runtime workloads.
+
+- New manifest: `k8s/imagemagick-policy.yaml`
+- Mounted into: `dms-api` and `dms-worker`
+- Activation env:
+	- `MAGICK_CONFIGURE_PATH=/etc/dms-imagemagick`
+	- `DMS_IMAGE_SANITIZE_ENABLED=true`
+	- `DMS_IMAGE_ALLOWED_EXTENSIONS=.jpg,.jpeg`
+
+The policy denies all coders/modules/delegates by default, then allows only
+the `JPEG` coder/module with conservative resource limits.
+
+Apply/re-apply as usual:
+
+```bash
+kubectl apply -k k8s
+```
+
+Inside application code or worker tasks, sanitize uploads by decode/re-encode,
+for example:
+
+```bash
+magick input.jpg -strip -auto-orient -quality 85 output.jpg
+```
+
+This keeps accepted extensions aligned with your `.jpg` upload requirement
+while reducing parser attack surface.

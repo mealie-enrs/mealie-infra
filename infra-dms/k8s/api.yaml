@@ -32,11 +32,29 @@ spec:
         - name: dms-api
           image: ghcr.io/nidhish1/dms-app:latest
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
           ports:
             - containerPort: 8000
           env:
             - name: DMS_ROLE
               value: api
+            - name: DMS_IMAGE_SANITIZE_ENABLED
+              value: "true"
+            - name: DMS_IMAGE_ALLOWED_EXTENSIONS
+              value: .jpg,.jpeg
+            - name: MAGICK_CONFIGURE_PATH
+              value: /etc/dms-imagemagick
             - name: REDIS_URL
               valueFrom:
                 configMapKeyRef:
@@ -104,6 +122,10 @@ spec:
                   key: DATABASE_PASSWORD
             - name: DATABASE_URL
               value: postgresql+psycopg://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)
+          volumeMounts:
+            - name: imagemagick-policy
+              mountPath: /etc/dms-imagemagick
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /healthz
@@ -116,3 +138,7 @@ spec:
               port: 8000
             initialDelaySeconds: 15
             periodSeconds: 20
+      volumes:
+        - name: imagemagick-policy
+          configMap:
+            name: dms-imagemagick-policy
