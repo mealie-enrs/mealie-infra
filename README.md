@@ -11,6 +11,7 @@ The stacks can be deployed on separate k3s VMs, or on the same cluster if you un
 
 - DMS detailed bring-up: [infra-dms/README.md](infra-dms/README.md)
 - Model-serve detailed bring-up: [infra-model-serve/k8s/DEPLOY.md](infra-model-serve/k8s/DEPLOY.md)
+- Optional Triton serving path: [infra-model-serve/triton/README.md](infra-model-serve/triton/README.md)
 - Repo file map: [infra-file-guide.md](infra-file-guide.md)
 - Sizing notes: [infra-requirements-table.md](infra-requirements-table.md)
 
@@ -27,6 +28,7 @@ The stacks can be deployed on separate k3s VMs, or on the same cluster if you un
 - `infra-model-serve/k8s/`: deploys `postgres`, `minio`, `mlflow`, `mms-model-serve`, and supporting jobs
 - `infra-model-serve/k8s/overlays/chameleon-s3/`: replaces in-cluster MinIO with Chameleon object storage
 - `infra-model-serve/docker-compose*.yml`: local Compose variants for the model-serve stack
+- `infra-model-serve/triton/`: optional Triton Inference Server assets and notes
 
 ## Shared Prerequisites
 
@@ -74,6 +76,14 @@ kubectl kustomize infra-model-serve/k8s/overlays/chameleon-s3 \
 ```
 
 for the Chameleon S3 overlay.
+
+### Optional Triton Path
+
+If you want to evaluate Triton as an alternative inference front-end instead of the FastAPI-based model-serve deployment, see:
+
+- [infra-model-serve/triton/README.md](infra-model-serve/triton/README.md)
+
+That path is optional and separate from the default `infra-model-serve/k8s/` deployment.
 
 ## Important Differences Between The Stacks
 
