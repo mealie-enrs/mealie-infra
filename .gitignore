@@ -46,6 +46,7 @@ override.tf.json
 # Kubernetes / Helm
 *.secret.yaml
 *.secrets.yaml
+*.example.yaml
 
 # Archives / backups
 *.bak
